@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VulnScan Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #161d27;
+    --panel-raised: #1c2530;
+    --border: #262f3b;
+    --text: #cbd5e1;
+    --muted: #64748b;
+    --amber: #f5a623;
+    --amber-dim: #8a6318;
+    --critical: #7f1d1d;
+    --high: #b91c1c;
+    --medium: #b45309;
+    --low: #1d4ed8;
+    --info: #4b5563;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', sans-serif;
+    background-image: radial-gradient(circle at 20% 0%, rgba(245,166,35,0.04), transparent 40%);
+  }
+  .shell { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .brand { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .brand .mark { width: 10px; height: 10px; border-radius: 2px; background: var(--amber); box-shadow: 0 0 12px var(--amber); }
+  .brand h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; margin: 0; }
+  .brand .tag { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .scan-bar { display: flex; gap: 10px; margin: 28px 0 8px; }
+  .scan-bar input {
+    flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    padding: 13px 16px; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 14px;
+  }
+  .scan-bar input:focus { outline: none; border-color: var(--amber); }
+  .scan-bar button {
+    background: var(--amber); color: #1a1200; border: none; border-radius: 6px;
+    padding: 0 24px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px;
+    cursor: pointer; letter-spacing: 0.3px;
+  }
+  .scan-bar button:disabled { background: var(--amber-dim); color: #a3906b; cursor: not-allowed; }
+  .scan-hint { color: var(--muted); font-size: 12px; margin-bottom: 28px; font-family: 'JetBrains Mono', monospace; }
+
+  .grid-top { display: grid; grid-template-columns: 220px 1fr; gap: 20px; margin-bottom: 24px; }
+  @media (max-width: 700px) { .grid-top { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .panel-title { font-family: 'Space Grotesk', sans-serif; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .gauge-score { font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 700; margin-top: -84px; }
+  .gauge-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  .gauge-rating { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1px; padding: 3px 10px; border-radius: 4px; margin-top: 6px; }
+
+  .console { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.9; max-height: 200px; overflow-y: auto; }
+  .console .line { color: var(--muted); }
+  .console .line.done { color: #86efac; }
+  .console .line.err { color: #fca5a5; }
+  .console .line .n { color: var(--amber); margin-right: 8px; }
+
+  .findings-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .finding { background: var(--panel-raised); border-left: 4px solid var(--info); border-radius: 6px; padding: 14px 18px; }
+  .finding .sev { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; color: white; letter-spacing: 0.5px; }
+  .finding h3 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; margin: 8px 0 4px; }
+  .finding p { font-size: 13.5px; color: var(--text); margin: 4px 0; opacity: 0.9; }
+  .finding .meta { font-size: 11.5px; color: var(--muted); margin-top: 8px; font-family: 'JetBrains Mono', monospace; }
+  .finding .fix { font-size: 12.5px; color: #86efac; margin-top: 6px; }
+
+  .owasp-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .owasp-table td { padding: 9px 4px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .owasp-table td:last-child { text-align: right; font-family: 'JetBrains Mono', monospace; }
+  .tested { color: #86efac; font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+  .not-tested { color: var(--muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+
+  .empty-state { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 0; font-family: 'JetBrains Mono', monospace; }
+  .section-spacer { margin-top: 28px; }
+  a.report-link { color: var(--amber); font-family: 'JetBrains Mono', monospace; font-size: 13px; text-decoration: none; }
+  a.report-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="brand"><div class="mark"></div><h1>VULNSCAN</h1><span class="tag">// detection console</span></div>
+
+  <div class="scan-bar">
+    <input id="urlInput" type="text" placeholder="https://target-site.com" />
+    <button id="scanBtn" onclick="startScan()">RUN SCAN</button>
+  </div>
+  <div class="scan-hint">Read-only + non-destructive detection probes only. Only scan systems you own or are authorized to test.</div>
+
+  <div class="grid-top">
+    <div class="panel gauge-wrap">
+      <div class="panel-title" style="align-self:flex-start;">RISK GAUGE</div>
+      <svg id="gaugeSvg" width="160" height="160" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="68" fill="none" stroke="#232b36" stroke-width="12"/>
+        <circle id="gaugeArc" cx="80" cy="80" r="68" fill="none" stroke="#f5a623" stroke-width="12"
+                stroke-linecap="round" stroke-dasharray="427" stroke-dashoffset="427"
+                transform="rotate(-90 80 80)"/>
+      </svg>
+      <div class="gauge-score" id="gaugeScore">--</div>
+      <div class="gauge-label">RISK SCORE</div>
+      <div class="gauge-rating" id="gaugeRating" style="background:#4b5563;">AWAITING SCAN</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">SCAN CONSOLE</div>
+      <div class="console" id="consoleLog">
+        <div class="line">&gt; idle. enter a target above and run scan.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel section-spacer">
+    <div class="panel-title">FINDINGS</div>
+    <div class="findings-list" id="findingsList">
+      <div class="empty-state">no scan run yet</div>
+    </div>
+  </div>
+
+  <div class="panel section-spacer">
+    <div class="panel-title">OWASP TOP 10 (2021) COVERAGE</div>
+    <table class="owasp-table" id="owaspTable"></table>
+  </div>
+
+  <div class="section-spacer" id="reportLinkWrap" style="display:none;">
+    <a class="report-link" id="reportLink" href="#" target="_blank">&#8595; open full HTML report</a>
+  </div>
+</div>
+
+<script>
+const SEV_COLORS = { CRITICAL: "#7f1d1d", HIGH: "#b91c1c", MEDIUM: "#b45309", LOW: "#1d4ed8", INFO: "#4b5563" };
+const SEV_WEIGHTS = { CRITICAL: 12, HIGH: 7, MEDIUM: 3, LOW: 1, INFO: 0 };
+const CIRCUMFERENCE = 2 * Math.PI * 68;
+
+function log(text, cls) {
+  const el = document.getElementById('consoleLog');
+  const line = document.createElement('div');
+  line.className = 'line' + (cls ? ' ' + cls : '');
+  line.innerHTML = text;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function startScan() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = 'SCANNING...';
+  document.getElementById('consoleLog').innerHTML = '';
+  document.getElementById('reportLinkWrap').style.display = 'none';
+  log(`&gt; target: ${url}`);
+  log(`&gt; dispatching modules (headers, tls, cors, injection probes, paths...)`);
+
+  try {
+    const resp = await fetch('/api/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      log(`&gt; error: ${data.detail || 'scan failed'}`, 'err');
+      return;
+    }
+    await replayConsole(data);
+    renderResults(data);
+  } catch (e) {
+    log(`&gt; network error: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'RUN SCAN';
+  }
+}
+
+async function replayConsole(data) {
+  let i = 1;
+  for (const mod of data.modules) {
+    await new Promise(r => setTimeout(r, 90));
+    if (mod.error) {
+      log(`<span class="n">[${i}]</span> ${mod.name}: <span style="color:#fca5a5">failed - ${mod.error}</span>`, 'err');
+    } else {
+      log(`<span class="n">[${i}]</span> ${mod.name}: ${mod.findings.length} finding(s)`, 'done');
+    }
+    i++;
+  }
+  log(`&gt; done in ${data.duration_seconds}s &middot; ${data.request_count} requests`);
+}
+
+function renderResults(data) {
+  // Gauge
+  const maxScoreForFullArc = 60; // visual scaling, not a hard cap
+  const pct = Math.min(data.risk_score / maxScoreForFullArc, 1);
+  const offset = CIRCUMFERENCE * (1 - pct);
+  document.getElementById('gaugeArc').style.strokeDashoffset = offset;
+  document.getElementById('gaugeArc').style.stroke = SEV_COLORS[data.overall_rating] || '#f5a623';
+  document.getElementById('gaugeScore').textContent = data.risk_score;
+  const ratingEl = document.getElementById('gaugeRating');
+  ratingEl.textContent = data.overall_rating;
+  ratingEl.style.background = SEV_COLORS[data.overall_rating] || '#4b5563';
+
+  // Findings
+  const allFindings = [];
+  data.modules.forEach(m => m.findings.forEach(f => allFindings.push(f)));
+  allFindings.sort((a, b) => (SEV_WEIGHTS[b.severity] || 0) - (SEV_WEIGHTS[a.severity] || 0));
+
+  const list = document.getElementById('findingsList');
+  list.innerHTML = '';
+  if (allFindings.length === 0) {
+    list.innerHTML = '<div class="empty-state">no findings surfaced - review module errors in the console above</div>';
+  } else {
+    allFindings.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'finding';
+      div.style.borderLeftColor = SEV_COLORS[f.severity] || '#4b5563';
+      div.innerHTML = `
+        <span class="sev" style="background:${SEV_COLORS[f.severity] || '#4b5563'}">${f.severity}</span>
+        <h3>${escapeHtml(f.check)}</h3>
+        <p>${escapeHtml(f.description)}</p>
+        ${f.evidence ? `<div class="meta">evidence: ${escapeHtml(f.evidence)}</div>` : ''}
+        <div class="meta">${escapeHtml(f.owasp_category)}</div>
+        ${f.remediation ? `<div class="fix">fix: ${escapeHtml(f.remediation)}</div>` : ''}
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  // OWASP table
+  const table = document.getElementById('owaspTable');
+  table.innerHTML = '';
+  Object.entries(data.owasp).forEach(([category, info]) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${escapeHtml(category)}</td>
+      <td>${info.tested ? '<span class="tested">&#10003; tested</span>' : '<span class="not-tested">manual review</span>'}</td>
+      <td>${info.finding_count}</td>
+    `;
+    table.appendChild(row);
+  });
+
+  // Report link
+  document.getElementById('reportLinkWrap').style.display = 'block';
+  document.getElementById('reportLink').href = `/api/report/${data.report_id}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
